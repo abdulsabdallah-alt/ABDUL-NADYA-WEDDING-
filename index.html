@@ -1,96 +1,285 @@
 <!doctype html>
 <html lang="sw">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Abdul & Nadya — Wedding Guest Check-in</title>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-<style>
-*{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111}
-.wrap{max-width:700px;margin:auto;padding:18px}.card{background:#fff;border-radius:22px;padding:28px 20px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
-h1{margin:0;text-align:center;font-size:38px}.sub{text-align:center;color:#666;font-size:20px;margin:8px 0 28px}
-button{width:100%;padding:16px;border:0;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer}
-.green{background:#438f52;color:#fff}.row{display:flex;gap:12px;margin-top:18px}
-input{flex:1;padding:16px;border:2px solid #ddd;border-radius:14px;font-size:20px;min-width:0}.row button{width:170px}
-#reader{margin-top:18px;border-radius:15px;overflow:hidden;display:none}.result{padding:20px;border-radius:16px;margin-top:18px;text-align:center}
-.valid{background:#e8f7ec;border:2px solid #26934a}.used{background:#fdeaea;border:2px solid #b52b2b}
-.invalid,.error{background:#fff2e5;border:2px solid #d98b16}.big{font-size:30px;font-weight:800;margin-bottom:8px}
-.info{font-size:18px;line-height:1.7}.small{color:#666;font-size:14px;text-align:center;margin-top:18px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>ABDUL & NADYA — Wedding Check-in</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+
+  <style>
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      background:#f3f4f6;
+      color:#111;
+    }
+    main{max-width:560px;margin:auto;padding:22px 16px 40px}
+    .card{
+      background:#fff;border-radius:24px;padding:28px 22px;
+      box-shadow:0 8px 30px rgba(0,0,0,.08)
+    }
+    h1{text-align:center;font-size:42px;line-height:1.05;margin:4px 0 8px}
+    .sub{text-align:center;color:#666;font-size:21px;margin:0 0 28px}
+    button{
+      width:100%;padding:17px 14px;border:0;border-radius:16px;
+      font-size:20px;font-weight:800;cursor:pointer
+    }
+    .green{background:#438f52;color:#fff}
+    .dark{background:#222;color:#fff;margin-top:10px}
+    .row{display:flex;gap:12px;margin-top:14px}
+    input{
+      flex:1;min-width:0;padding:17px;border:2px solid #ddd;
+      border-radius:16px;font-size:20px;font-weight:600
+    }
+    .check{width:145px}
+    #reader{
+      width:100%;overflow:hidden;border-radius:16px;margin-top:16px;
+      background:#111;display:none
+    }
+    .result{
+      margin-top:18px;padding:22px;border-radius:18px;text-align:center;
+      border:2px solid
+    }
+    .valid{background:#e9f7ec;border-color:#438f52}
+    .full,.invalid,.error{background:#fff0f0;border-color:#b52b2b}
+    .title{font-size:31px;font-weight:900;margin-bottom:12px}
+    .name{font-size:23px;font-weight:800;margin:8px 0}
+    .small{font-size:18px;line-height:1.6}
+    .info{text-align:center;color:#777;font-size:16px;margin-top:18px}
+    .hidden{display:none!important}
+    .setup{
+      background:#fff7df;border:2px solid #d49b24;color:#624800;
+      padding:14px;border-radius:14px;margin-bottom:16px;font-size:15px;line-height:1.4
+    }
+  </style>
 </head>
+
 <body>
-<div class="wrap"><div class="card">
-<h1>ABDUL & NADYA</h1><div class="sub">Wedding Guest Check-in</div>
-<button id="scanBtn" class="green">📷 ANZA KUSCAN QR</button>
-<div id="reader"></div>
-<div class="row"><input id="invitationInput" placeholder="MFANO: A00125" autocomplete="off"><button id="checkBtn" class="green">CHECK</button></div>
-<div id="result"></div><div class="small">Mfumo wa check-in wa wageni</div>
-</div></div>
+<main>
+  <div class="card">
+    <h1>ABDUL &amp; NADYA</h1>
+    <p class="sub">Wedding Guest Check-in</p>
+
+    <div id="setup" class="setup hidden">
+      Mfumo haujaunganishwa na Supabase bado. Weka Publishable Key kwenye sehemu ya
+      <b>SUPABASE_KEY</b> ndani ya faili hili kabla ya ku-upload GitHub.
+    </div>
+
+    <button id="start" class="green">📷 ANZA KUSCAN QR</button>
+
+    <div id="reader"></div>
+
+    <div class="row">
+      <input id="manualId" placeholder="MFANO: A00125" autocomplete="off" autocapitalize="characters">
+      <button id="check" class="green check">CHECK</button>
+    </div>
+
+    <button id="stop" class="dark hidden">⏹ SIMAMISHA CAMERA</button>
+
+    <div id="result"></div>
+    <div class="info">Mfumo wa check-in wa wageni</div>
+  </div>
+</main>
+
 <script>
 const SUPABASE_URL = "https://whxmzhanjksmbtmsyorv.supabase.co";
+
+/*
+  IMPORTANT:
+  Weka Publishable Key yako hapa.
+  Usitumie Secret key / service_role key.
+*/
 const SUPABASE_KEY = "sb_publishable_AAnEo4XB4zletaAXE1Socw_k5KnXsSD";
-let scanner=null, scanning=false, lastScanned="";
 
-function showResult(type,title,details=""){
- const box=document.getElementById("result");
- box.className="result "+type;
- box.innerHTML='<div class="big">'+title+'</div><div class="info">'+details+'</div>';
+let supabaseClient = null;
+let scanner = null;
+let scanning = false;
+
+const setup = document.getElementById("setup");
+const reader = document.getElementById("reader");
+const result = document.getElementById("result");
+const manualId = document.getElementById("manualId");
+const startBtn = document.getElementById("start");
+const stopBtn = document.getElementById("stop");
+const checkBtn = document.getElementById("check");
+
+if (SUPABASE_KEY === "sb_publishable_AAnEo4XB4zletaAXE1Socw_k5KnXsSD") {
+  setup.classList.remove("hidden");
+} else {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
-function extractInvitationId(value){
- const text=String(value||"").trim().toUpperCase();
- const match=text.match(/\bA\d{5,}\b/);
- return match?match[0]:text;
+
+function extractInvitationId(text){
+  const raw = String(text || "").trim().toUpperCase();
+
+  // Kadi yetu ya QR inaweza kuwa plain A00125
+  const m = raw.match(/\bA\d{5}\b/);
+  if (m) return m[0];
+
+  // Pia inaruhusu QR yenye maandishi kama:
+  // INVITATION A00125 / GUESTS 2
+  const m2 = raw.match(/A\d+/);
+  return m2 ? m2[0] : raw;
 }
-async function checkIn(rawValue){
- const invitationId=extractInvitationId(rawValue);
- if(!invitationId){showResult("invalid","⚠️ INVALID","Tafadhali weka Invitation ID.");return;}
- document.getElementById("checkBtn").disabled=true;
- showResult("error","⏳ INASOMA...","Inaunganisha na database...");
- try{
-  const response=await fetch(SUPABASE_URL+"/rest/v1/rpc/check_in_guest",{
-   method:"POST",
-   headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY},
-   body:JSON.stringify({p_invitation_id:invitationId})
-  });
-  const data=await response.json();
-  if(!response.ok) throw new Error(JSON.stringify(data));
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row){showResult("error","⚠️ ERROR","Hakuna majibu kutoka database.");return;}
-  if(row.status==="VALID"){
-   showResult("valid","✅ VALID","<strong>"+row.guest_name+"</strong><br>Invitation: "+row.invitation_id+"<br>Type: "+row.guest_type+"<br>Wageni: <strong>"+row.guest_count+"</strong><br><strong>CHECK-IN IMEFANYIKA</strong>");
-  }else if(row.status==="ALREADY_USED"){
-   showResult("used","🚫 ALREADY USED","<strong>"+row.guest_name+"</strong><br>Invitation: "+row.invitation_id+"<br>Wageni: "+row.guest_count+"<br><strong>Kadi hii tayari imetumika.</strong>");
-  }else{
-   showResult("invalid","❌ INVALID","Invitation ID hii haipo kwenye database.");
+
+function showResult(type, data){
+  if (!data) {
+    result.innerHTML = `
+      <div class="result invalid">
+        <div class="title">❌ INVALID</div>
+        <div class="name">Kadi haijatambuliwa</div>
+        <div class="small">Invitation ID hii haipo kwenye database.</div>
+      </div>`;
+    return;
   }
- }catch(error){
-  console.error(error);
-  showResult("error","⚠️ ERROR","Imeshindikana kuwasiliana na database. Hakikisha internet ipo.");
- }finally{document.getElementById("checkBtn").disabled=false;}
-}
-document.getElementById("checkBtn").addEventListener("click",()=>checkIn(document.getElementById("invitationInput").value));
-document.getElementById("invitationInput").addEventListener("keydown",e=>{if(e.key==="Enter")checkIn(e.target.value);});
 
-document.getElementById("scanBtn").addEventListener("click",async()=>{
- const reader=document.getElementById("reader");
- if(scanning){
-  try{await scanner.stop();await scanner.clear();}catch(e){}
-  scanning=false;reader.style.display="none";document.getElementById("scanBtn").textContent="📷 ANZA KUSCAN QR";return;
- }
- reader.style.display="block";document.getElementById("scanBtn").textContent="⏹️ SIMAMISHA CAMERA";
- scanner=new Html5Qrcode("reader");scanning=true;lastScanned="";
- try{
-  await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},async decodedText=>{
-   if(decodedText===lastScanned)return;lastScanned=decodedText;
-   await checkIn(decodedText);
-   try{await scanner.stop();await scanner.clear();}catch(e){}
-   scanning=false;reader.style.display="none";document.getElementById("scanBtn").textContent="📷 ANZA KUSCAN QR";
-  },errorMessage=>{});
- }catch(error){
-  console.error(error);scanning=false;reader.style.display="none";document.getElementById("scanBtn").textContent="📷 ANZA KUSCAN QR";
-  showResult("error","⚠️ CAMERA ERROR","Ruhusu Camera kwenye Safari kisha jaribu tena.");
- }
+  const count = data.checked_in_count ?? 0;
+  const total = data.guest_count ?? 0;
+
+  if (type === "VALID") {
+    result.innerHTML = `
+      <div class="result valid">
+        <div class="title">✅ CHECK-IN</div>
+        <div class="name">${escapeHtml(data.guest_name)}</div>
+        <div class="small">
+          Invitation: ${escapeHtml(data.invitation_id)}<br>
+          Type: ${escapeHtml(data.guest_type || "")}<br>
+          Wageni: <b>${count} / ${total}</b>
+        </div>
+        <div class="name">CHECK-IN IMEFANYIKA</div>
+      </div>`;
+  } else if (type === "ALREADY_FULL") {
+    result.innerHTML = `
+      <div class="result full">
+        <div class="title">⛔ ALREADY FULL</div>
+        <div class="name">${escapeHtml(data.guest_name)}</div>
+        <div class="small">
+          Invitation: ${escapeHtml(data.invitation_id)}<br>
+          Wageni: <b>${count} / ${total}</b>
+        </div>
+        <div class="name">Kadi hii imetumika kikamilifu.</div>
+      </div>`;
+  }
+}
+
+function escapeHtml(v){
+  return String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+async function checkInvitation(id){
+  if (!supabaseClient){
+    setup.classList.remove("hidden");
+    return;
+  }
+
+  id = extractInvitationId(id);
+  if (!id) return;
+
+  manualId.value = id;
+  result.innerHTML = "";
+
+  checkBtn.disabled = true;
+  checkBtn.textContent = "CHECKING...";
+
+  const { data, error } = await supabaseClient.rpc("check_in_guest", {
+    p_invitation_id: id
+  });
+
+  checkBtn.disabled = false;
+  checkBtn.textContent = "CHECK";
+
+  if (error){
+    result.innerHTML = `
+      <div class="result error">
+        <div class="title">⚠️ ERROR</div>
+        <div class="small">Imeshindikana kuwasiliana na database.</div>
+      </div>`;
+    console.error(error);
+    return;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if (!row || row.status === "INVALID"){
+    showResult("INVALID", null);
+  } else {
+    showResult(row.status, row);
+  }
+}
+
+checkBtn.addEventListener("click", () => checkInvitation(manualId.value));
+
+manualId.addEventListener("keydown", e => {
+  if (e.key === "Enter") checkInvitation(manualId.value);
 });
+
+startBtn.addEventListener("click", async () => {
+  if (!supabaseClient){
+    setup.classList.remove("hidden");
+    return;
+  }
+
+  if (typeof Html5Qrcode === "undefined"){
+    alert("QR scanner bado inapakia. Jaribu tena baada ya sekunde chache.");
+    return;
+  }
+
+  reader.style.display = "block";
+  startBtn.classList.add("hidden");
+  stopBtn.classList.remove("hidden");
+
+  scanner = new Html5Qrcode("reader");
+
+  try{
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      async decodedText => {
+        const id = extractInvitationId(decodedText);
+        manualId.value = id;
+
+        if (scanning) {
+          scanning = false;
+          await stopScanner();
+          await checkInvitation(id);
+        }
+      },
+      () => {}
+    );
+    scanning = true;
+  }catch(err){
+    console.error(err);
+    result.innerHTML = `
+      <div class="result error">
+        <div class="title">⚠️ CAMERA ERROR</div>
+        <div class="small">
+          Ruhusu camera kwenye Safari na hakikisha website inafunguka kwa HTTPS.
+        </div>
+      </div>`;
+    await stopScanner();
+  }
+});
+
+stopBtn.addEventListener("click", stopScanner);
+
+async function stopScanner(){
+  if (scanner){
+    try{
+      if (scanning) await scanner.stop();
+    }catch(e){}
+    try{ scanner.clear(); }catch(e){}
+  }
+  scanner = null;
+  scanning = false;
+  reader.style.display = "none";
+  stopBtn.classList.add("hidden");
+  startBtn.classList.remove("hidden");
+}
 </script>
 </body>
 </html>
